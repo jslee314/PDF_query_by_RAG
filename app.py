@@ -8,6 +8,8 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.prompts import PromptTemplate
 from langchain.callbacks.tracers import LangChainTracer
+from translator import build_translator_chain
+
 from dotenv import load_dotenv
 import os
 import yaml
@@ -47,6 +49,11 @@ with st.sidebar:
         "온도 설정 (temperature)",
         min_value=0.0, max_value=1.0,
         value=0.0, step=0.01
+    )
+    # 번역 체인 생성
+    translator_chain = build_translator_chain(
+        model_name=selected_model,
+        temperature=temperature
     )
 
 def print_messages():
@@ -106,7 +113,13 @@ if uploaded_files:
     # 3) 벡터스토어 생성
     vectorstore = create_vectorstore(split_docs, embeddings)
     retriever = vectorstore.as_retriever()
-    # 4) 체인 초기화 (온도 반영)
+    # 4) 번역 체인 + 기존 RAG 체인 합성
+    rag_runnable = create_chain(
+        retriever,
+        model_name=selected_model,
+        temperature=temperature
+    )
+    # 5) 체인 초기화
     st.session_state["chain"] = create_chain(
         retriever,
         model_name=selected_model,
