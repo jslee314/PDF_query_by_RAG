@@ -7,12 +7,16 @@ from langchain_community.document_loaders import PDFPlumberLoader
 from langchain_community.vectorstores import FAISS
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.prompts import PromptTemplate
+from langchain.callbacks.tracers import LangChainTracer
 from dotenv import load_dotenv
 import os
 import yaml
 
 # 환경 변수 로드
 load_dotenv()
+
+# 2) LangChainTracer 생성 (환경 변수에서 PROJECT_NAME, RUN_NAME 읽음)
+tracer = LangChainTracer()
 
 # 캐시 디렉토리 생성
 os.makedirs(".cache/files", exist_ok=True)
@@ -80,7 +84,12 @@ def create_chain(retriever, model_name="gpt-4o", temperature=0.0):
         template=spec["template"],
         input_variables=spec["input_variables"],
     )
-    llm = ChatOpenAI(model_name=model_name, temperature=temperature)
+    # callback_manager로 tracer 지정 → 모든 LLM 호출이 LangSmith에 기록됩니다
+    llm = ChatOpenAI(
+        model_name=model_name,
+        temperature=temperature,
+        callbacks=[tracer]
+        )
     return (
         {"context": retriever, "question": RunnablePassthrough()}
         | prompt
