@@ -1,0 +1,23 @@
+# 가상환경
+venv/
+.env
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Streamlit·FAISS 캐시
+.cache/
+
+# VS Code 설정
+.vscode/
+
+# 배포 산출물
+dist/
+build/
+*.egg-info/
+
+# 시스템 파일
+.DS_Store
+Thumbs.db

@@ -1,0 +1,25 @@
+streamlit>=1.15.0
+python-dotenv>=0.21.0
+openai>=0.28.0
+
+# LangChain 핵심·OpenAI 래퍼
+langchain-core
+langchain-openai
+
+# Teddynote 확장 (로깅·프롬프트)
+langchain-teddynote
+
+# 텍스트 분할기
+langchain-text-splitters
+
+# PDF 로더·벡터 저장소
+langchain-community
+
+# FAISS (CPU 버전)
+faiss-cpu
+
+# PDFPlumber (langchain-community가 필요로 함)
+pdfplumber
+
+# YAML 로드 (프롬프트)
+pyyaml
