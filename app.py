@@ -6,12 +6,12 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PDFPlumberLoader
 from langchain_community.vectorstores import FAISS
 from langchain_core.runnables import RunnablePassthrough
-from langchain_core.prompts import PromptTemplate    
+from langchain_core.prompts import PromptTemplate
 from dotenv import load_dotenv
 import os
 import yaml
 
-# API KEY 정보 로드
+# 환경 변수 로드
 load_dotenv()
 
 # 캐시 디렉토리 생성
@@ -26,11 +26,24 @@ if "messages" not in st.session_state:
 if "chain" not in st.session_state:
     st.session_state["chain"] = None
 
-# 사이드바
+# 사이드바 UI
 with st.sidebar:
-    clear_btn    = st.button("대화 초기화")
-    uploaded_file = st.file_uploader("파일 업로드", type=["pdf"])
-    selected_model = st.selectbox("LLM 선택", ["gpt-4o", "gpt-4-turbo", "gpt-4o-mini"], index=0)
+    clear_btn      = st.button("대화 초기화")
+    uploaded_files = st.file_uploader(
+        "PDF 파일 업로드",
+        type=["pdf"],
+        accept_multiple_files=True
+    )
+    selected_model = st.selectbox(
+        "LLM 선택",
+        ["gpt-4o", "gpt-4-turbo", "gpt-4o-mini"],
+        index=0
+    )
+    temperature = st.slider(
+        "온도 설정 (temperature)",
+        min_value=0.0, max_value=1.0,
+        value=0.0, step=0.01
+    )
 
 def print_messages():
     for msg in st.session_state["messages"]:
@@ -39,48 +52,57 @@ def print_messages():
 def add_message(role, content):
     st.session_state["messages"].append(ChatMessage(role=role, content=content))
 
-@st.cache_resource(show_spinner="업로드한 파일을 처리 중입니다...")
-def embed_file(file):
-    path = f".cache/files/{file.name}"
-    with open(path, "wb") as f:
-        f.write(file.read())
+@st.cache_resource(show_spinner="문서 로드 및 분할 중입니다...")
+def load_and_split(files):
+    all_docs = []
+    for file in files:
+        path = f".cache/files/{file.name}"
+        with open(path, "wb") as f:
+            f.write(file.read())
+        docs = PDFPlumberLoader(path).load()
+        splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=50)
+        all_docs.extend(splitter.split_documents(docs))
+    return all_docs
 
-    docs = PDFPlumberLoader(path).load()
-    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=50)
-    splits = splitter.split_documents(docs)
+@st.cache_resource(show_spinner="임베딩 객체 생성 중입니다...")
+def get_embeddings():
+    return OpenAIEmbeddings()
 
-    embeddings = OpenAIEmbeddings()
-    vectorstore = FAISS.from_documents(splits, embeddings)
-    return vectorstore.as_retriever()
+@st.cache_resource(show_spinner="벡터스토어(FAISS) 생성 중입니다...")
+def create_vectorstore(_documents, _embeddings):
+    return FAISS.from_documents(_documents, _embeddings)
 
-def create_chain(retriever, model_name="gpt-4o"):
-    # 1) YAML에서 prompt 스펙 로드
+def create_chain(retriever, model_name="gpt-4o", temperature=0.0):
+    # YAML에서 프롬프트 스펙 로드
     with open("prompts/pdf-rag.yaml", encoding="utf-8") as f:
-        prompt_spec = yaml.safe_load(f)
-
-    # 2) PromptTemplate 객체 생성
-    prompt_template = PromptTemplate(
-        template=prompt_spec["template"],
-        input_variables=prompt_spec["input_variables"],
+        spec = yaml.safe_load(f)
+    prompt = PromptTemplate(
+        template=spec["template"],
+        input_variables=spec["input_variables"],
     )
-
-    # 3) LLM 객체
-    llm = ChatOpenAI(model_name=model_name, temperature=0)
-
-    # 4) Runnable 파이프라인 구성
-    #    retriever에서 context, RunnablePassthrough로 question 받아
-    #    → PromptTemplate (Runnable) → LLM → StrOutputParser
+    llm = ChatOpenAI(model_name=model_name, temperature=temperature)
     return (
         {"context": retriever, "question": RunnablePassthrough()}
-        | prompt_template
+        | prompt
         | llm
         | StrOutputParser()
     )
 
-# 파일 업로드 시
-if uploaded_file:
-    retriever = embed_file(uploaded_file)
-    st.session_state["chain"] = create_chain(retriever, selected_model)
+# 메인 로직
+if uploaded_files:
+    # 1) 문서 로드 및 분할
+    split_docs = load_and_split(uploaded_files)
+    # 2) 임베딩 객체 생성
+    embeddings = get_embeddings()
+    # 3) 벡터스토어 생성
+    vectorstore = create_vectorstore(split_docs, embeddings)
+    retriever = vectorstore.as_retriever()
+    # 4) 체인 초기화 (온도 반영)
+    st.session_state["chain"] = create_chain(
+        retriever,
+        model_name=selected_model,
+        temperature=temperature
+    )
 
 if clear_btn:
     st.session_state["messages"].clear()
@@ -92,7 +114,7 @@ warning = st.empty()
 
 if user_input:
     chain = st.session_state["chain"]
-    if chain:
+    if chain is not None:
         st.chat_message("user").write(user_input)
         response = chain.stream(user_input)
         with st.chat_message("assistant"):
@@ -104,4 +126,4 @@ if user_input:
         add_message("user", user_input)
         add_message("assistant", answer)
     else:
-        warning.error("파일을 업로드 해주세요.")
+        warning.error("PDF 파일을 먼저 업로드 해주세요.")
