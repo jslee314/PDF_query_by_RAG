@@ -47,6 +47,12 @@ selected_model = st.sidebar.selectbox(
 temperature = st.sidebar.slider(
     "온도 설정 (temperature)", 0.0, 1.0, 0.0, 0.01
 )
+loader_option = st.sidebar.selectbox(
+    "문서 로더 선택", ["PyPDFLoader", "PDFPlumberLoader", "UnstructuredPDFLoader"], index=1
+)
+splitter_option = st.sidebar.selectbox(
+    "스플릿터 선택", ["RecursiveCharacterTextSplitter", "SpacyTextSplitter", "TokenTextSplitter"], index=1
+)
 translator_chain = build_translator_chain(
     model_name=selected_model,
     temperature=temperature
@@ -59,7 +65,9 @@ if mode == "문서 처리":
         selected_model=selected_model,
         temperature=temperature,
         translator_chain=translator_chain,
-        tracer=tracer
+        tracer=tracer,
+        loader_option=loader_option,
+        splitter_option=splitter_option
     )
 elif mode == "질문 응답":
     qa_processor.render(

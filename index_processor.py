@@ -32,7 +32,7 @@ def create_chain(retriever_fn, model_name="gpt-4o", temperature=0.0, tracer=None
     )
 
 
-def render(uploaded_files, selected_model, temperature, translator_chain, tracer):
+def render(uploaded_files, selected_model, temperature, translator_chain, tracer, loader_option, splitter_option):
     st.header("1. 문서 업로드 및 처리")
 
     if not uploaded_files:
@@ -48,7 +48,7 @@ def render(uploaded_files, selected_model, temperature, translator_chain, tracer
 
     for idx, f in enumerate(uploaded_files, start=1):
         st.subheader(f"🔄 처리 중: {f.name}")
-        docs = load_and_split([f])
+        docs = load_and_split([f], loader_option=loader_option, splitter_option=splitter_option)
         st.write(f"- 청크 생성: {len(docs)}개")
         split_docs_by_file[f.name] = docs
 

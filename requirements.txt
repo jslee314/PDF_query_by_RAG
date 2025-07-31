@@ -25,3 +25,9 @@ pdfplumber
 
 # YAML 로드 (프롬프트)
 pyyaml
+
+# 추가 로더 및 스플릿터 의존성
+pypdf2
+unstructured
+spacy # python -m spacy download en_core_web_sm 를 추가로 실행해줘야함
+tiktoken
