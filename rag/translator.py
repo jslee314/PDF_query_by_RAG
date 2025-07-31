@@ -4,7 +4,7 @@ from langchain_core.prompts import PromptTemplate
 
 def build_translator_chain(model_name: str = "gpt-4o", temperature: float = 0.0) -> LLMChain:
     """
-    한글 질문을 영어로 번역하는 LLMChain을 반환합니다.
+    질문을 한글과 영어로 번역하는 LLMChain을 반환합니다.
     """
     # 1) 번역용 PromptTemplate
     translate_prompt = PromptTemplate(
