@@ -37,7 +37,7 @@ mode = st.sidebar.radio("모드 선택", ["문서 처리", "질문 응답"])
 if "messages" not in st.session_state:
     st.session_state["messages"] = []
 
-# 사이드바: 파일 업로드, 모델, 온도
+# 사이드바: 파일 업로드, 모델, 온도, 로더/스플릿터 옵션 선택
 uploaded_files = st.sidebar.file_uploader(
     "PDF 파일 업로드", type=["pdf"], accept_multiple_files=True
 )
@@ -48,11 +48,25 @@ temperature = st.sidebar.slider(
     "온도 설정 (temperature)", 0.0, 1.0, 0.0, 0.01
 )
 loader_option = st.sidebar.selectbox(
-    "문서 로더 선택", ["PyPDFLoader", "PDFPlumberLoader", "UnstructuredPDFLoader"], index=1
+    "문서 로더 선택",
+    ["PyPDFLoader", "PDFPlumberLoader", "UnstructuredPDFLoader"],
+    index=1
 )
 splitter_option = st.sidebar.selectbox(
-    "스플릿터 선택", ["RecursiveCharacterTextSplitter", "SpacyTextSplitter", "TokenTextSplitter"], index=1
+    "스플릿터 선택",
+    ["RecursiveCharacterTextSplitter", "SpacyTextSplitter", "TokenTextSplitter"],
+    index=0
 )
+
+# 사이드바: YAML 프롬프트 로드 & 편집
+with st.sidebar.expander("🔧 RAG 프롬프트 편집"):
+    raw_spec = yaml.safe_load(open("prompts/pdf-rag.yaml", encoding="utf-8"))
+    default_template = raw_spec["template"]
+    input_vars       = raw_spec["input_variables"]
+    edited_template  = st.text_area(
+        "Prompt Template", value=default_template, height=200
+    )
+
 translator_chain = build_translator_chain(
     model_name=selected_model,
     temperature=temperature
@@ -67,7 +81,9 @@ if mode == "문서 처리":
         translator_chain=translator_chain,
         tracer=tracer,
         loader_option=loader_option,
-        splitter_option=splitter_option
+        splitter_option=splitter_option,
+        prompt_template=edited_template,
+        input_variables=input_vars,
     )
 elif mode == "질문 응답":
     qa_processor.render(

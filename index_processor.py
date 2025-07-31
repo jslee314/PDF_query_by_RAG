@@ -9,20 +9,24 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import StrOutputParser
-import yaml
 
-
-def create_chain(retriever_fn, model_name="gpt-4o", temperature=0.0, tracer=None):
-    with open("prompts/pdf-rag.yaml", encoding="utf-8") as f:
-        spec = yaml.safe_load(f)
+def create_chain(
+    retriever_fn,
+    model_name="gpt-4o",
+    temperature=0.0,
+    tracer: LangChainTracer = None,
+    prompt_template: str = None,
+    input_variables: list[str] = None,
+):
+    """프롬프트 템플릿을 인자로 받아 Chain 생성"""
     prompt = PromptTemplate(
-        template=spec["template"],
-        input_variables=spec["input_variables"],
+        template=prompt_template,
+        input_variables=input_variables,
     )
     llm = ChatOpenAI(
         model_name=model_name,
         temperature=temperature,
-        callbacks=[tracer] if tracer else None
+        callbacks=[tracer] if tracer else None,
     )
     return (
         {"context": retriever_fn, "question": RunnablePassthrough()}
@@ -31,8 +35,17 @@ def create_chain(retriever_fn, model_name="gpt-4o", temperature=0.0, tracer=None
         | StrOutputParser()
     )
 
-
-def render(uploaded_files, selected_model, temperature, translator_chain, tracer, loader_option, splitter_option):
+def render(
+    uploaded_files,
+    selected_model,
+    temperature,
+    translator_chain,
+    tracer,
+    loader_option,
+    splitter_option,
+    prompt_template,
+    input_variables,
+):
     st.header("1. 문서 업로드 및 처리")
 
     if not uploaded_files:
@@ -43,12 +56,16 @@ def render(uploaded_files, selected_model, temperature, translator_chain, tracer
     progress = st.progress(0)
 
     split_docs_by_file = {}
-    file_retrievers = {}
-    file_chains = {}
+    file_retrievers    = {}
+    file_chains        = {}
 
     for idx, f in enumerate(uploaded_files, start=1):
         st.subheader(f"🔄 처리 중: {f.name}")
-        docs = load_and_split([f], loader_option=loader_option, splitter_option=splitter_option)
+        docs = load_and_split(
+            [f],
+            loader_option=loader_option,
+            splitter_option=splitter_option,
+        )
         st.write(f"- 청크 생성: {len(docs)}개")
         split_docs_by_file[f.name] = docs
 
@@ -64,7 +81,9 @@ def render(uploaded_files, selected_model, temperature, translator_chain, tracer
             retriever_fn=file_retrievers[f.name],
             model_name=selected_model,
             temperature=temperature,
-            tracer=tracer
+            tracer=tracer,
+            prompt_template=prompt_template,
+            input_variables=input_variables,
         )
         st.write("- RAG 체인 초기화 완료")
         file_chains[f.name] = chain
@@ -75,6 +94,6 @@ def render(uploaded_files, selected_model, temperature, translator_chain, tracer
     st.success("✅ 문서 처리 완료!")
 
     st.session_state["split_docs_by_file"] = split_docs_by_file
-    st.session_state["file_retrievers"] = file_retrievers
-    st.session_state["file_chains"] = file_chains
-    st.session_state["processed"] = True
+    st.session_state["file_retrievers"]    = file_retrievers
+    st.session_state["file_chains"]        = file_chains
+    st.session_state["processed"]          = True
