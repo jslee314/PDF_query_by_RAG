@@ -26,14 +26,13 @@ tracer = LangChainTracer()
 os.makedirs(".cache/files", exist_ok=True)
 os.makedirs(".cache/embeddings", exist_ok=True)
 
-st.title("PDF 기반 QA💬")
+st.title("PDF 기반 QA")
 
 # 세션 초기화
 if "messages" not in st.session_state:
     st.session_state["messages"] = []
-# 🔥 변경: 파일별 분할/리트리버/체인 저장용
 if "split_docs_by_file" not in st.session_state:
-    st.session_state["split_docs_by_file"] = {}
+    st.session_state["split_docs_by_file"] = {} # 파일별 분할/리트리버/체인 저장용
 if "file_retrievers" not in st.session_state:
     st.session_state["file_retrievers"] = {}
 if "file_chains" not in st.session_state:
@@ -137,17 +136,35 @@ if user_input:
         eng_q = translator_chain.predict(text=user_input)
         st.chat_message("assistant").write(f"🔄 번역된 질문: {eng_q}")
 
-        # 2) 파일별 답변 스트리밍
+        # 2) 🔥 파일별 리트리버 결과를 스트리밍 형식으로 표시
+        for fname, retriever in st.session_state["file_retrievers"].items():
+            st.markdown(f"### 📂 {fname} - 유사도 상위 결과")
+            top_docs = retriever.get_relevant_documents(eng_q)[:3]
+            for i, doc in enumerate(top_docs, start=1):
+                source = doc.metadata.get("source", fname)
+                page   = doc.metadata.get("page", "N/A")
+                st.markdown(f"**결과 {i}** (출처: {source}, 페이지: {page})")
+                # 내용 스트리밍
+                with st.chat_message("assistant"):
+                    container = st.empty()
+                    text = doc.page_content[:300] + "…"
+                    streamed = ""
+                    for ch in text:
+                        streamed += ch
+                        container.markdown(streamed)
+                st.write("")  # 한 결과 끝나면 한 줄 띄우기
+            st.write("---")
+
+        # 3) 파일별 RAG 답변 스트리밍
         for fname, chain in st.session_state["file_chains"].items():
-            st.markdown(f"### 📄 {fname}")
+            st.markdown(f"### 📄 답변 from {fname}")
             with st.chat_message("assistant"):
                 container = st.empty()
                 answer = ""
-                for token in chain.stream(eng_q):  # 🔥 stream() 사용
+                for token in chain.stream(eng_q):
                     answer += token
                     container.markdown(answer)
             st.write("---")
-
         # 3) 대화 기록에 추가
         add_message("user", user_input)
         # 전체 파일별 답변을 하나로 합쳐 기록
